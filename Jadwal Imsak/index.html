@@ -6,6 +6,7 @@
     <title>Imsakiyah & Adzan Pro</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root { --primary: #004d40; --accent: #ffc107; --bg: #f4f7f6; --danger: #d32f2f; --maghrib: #e65100; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
@@ -99,15 +100,36 @@
         }
     });
 
+    // function getLocation() {
+    //     const btn = document.getElementById('btnGps'), loader = document.getElementById('loader');
+    //     btn.disabled = true; loader.style.display = 'block';
+    //     navigator.geolocation.getCurrentPosition(async (pos) => {
+    //         const res = await fetch(`https://api.myquran.com/v2/sholat/kota/lokasi/${pos.coords.latitude}/${pos.coords.longitude}`);
+    //         const data = await res.json();
+    //         btn.disabled = false; loader.style.display = 'none';
+    //         if(data.data) pilihKota(data.data.id, data.data.lokasi);
+    //     }, () => { btn.disabled = false; loader.style.display = 'none'; alert("Gagal GPS"); });
+    // }
+
+    // Ganti fungsi getLocation yang lama dengan ini:
     function getLocation() {
-        const btn = document.getElementById('btnGps'), loader = document.getElementById('loader');
-        btn.disabled = true; loader.style.display = 'block';
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const res = await fetch(`https://api.myquran.com/v2/sholat/kota/lokasi/${pos.coords.latitude}/${pos.coords.longitude}`);
-            const data = await res.json();
-            btn.disabled = false; loader.style.display = 'none';
-            if(data.data) pilihKota(data.data.id, data.data.lokasi);
-        }, () => { btn.disabled = false; loader.style.display = 'none'; alert("Gagal GPS"); });
+        Swal.fire({
+            title: 'Mohon Maaf 🙏',
+            text: 'Fitur deteksi lokasi otomatis sedang dalam tahap pengembangan agar lebih akurat.',
+            icon: 'info',
+            confirmButtonText: 'Siap, saya cari manual!',
+            confirmButtonColor: '#004d40',
+            showClass: {
+                popup: 'animate__animated animate__fadeInDown'
+            },
+            hideClass: {
+                popup: 'animate__animated animate__fadeOutUp'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('inputKota').focus();
+            }
+        });
     }
 
     async function pilihKota(id, nama) {

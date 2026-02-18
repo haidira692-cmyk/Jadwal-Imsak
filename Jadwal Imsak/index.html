@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imsakiyah & Adzan Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+    <style>
+        :root { --primary: #004d40; --accent: #ffc107; --bg: #f4f7f6; --danger: #d32f2f; --maghrib: #e65100; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .card { background: white; padding: 25px; border-radius: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 450px; text-align: center; }
+        .clock-live { font-size: 1.2rem; font-weight: bold; color: var(--primary); margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin: 10px 0; color: var(--primary); }
+        .btn-gps { background: #e8f5e9; color: var(--primary); border: 2px solid var(--primary); padding: 12px; width: 100%; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        #loader { display: none; width: 25px; height: 25px; border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .search-container { position: relative; margin-bottom: 20px; }
+        input { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 12px; box-sizing: border-box; outline: none; font-size: 1rem; }
+        .autocomplete-list { position: absolute; width: 100%; background: white; border: 1px solid #ddd; z-index: 99; max-height: 200px; overflow-y: auto; text-align: left; border-radius: 10px; display: none; }
+        .autocomplete-list div { padding: 12px; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
+        .result-box { display: none; animation: fadeIn 0.4s ease-out; }
+        .countdown-card { background: var(--primary); color: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; }
+        .countdown-time { font-size: 2.5rem; font-weight: bold; color: var(--accent); }
+        .info-card { border: 2px solid #eee; padding: 15px; border-radius: 15px; }
+        .imsak-val { font-size: 3.5rem; font-weight: bold; color: var(--danger); margin: 5px 0; }
+        #notifPopup { display: none; position: fixed; top: 10px; background: var(--maghrib); color: white; padding: 12px 25px; border-radius: 50px; font-weight: bold; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div id="notifPopup">📢 SELAMAT BERBUKA PUASA!</div>
+
+<div class="card">
+    <div class="clock-live" id="liveClock">00:00:00</div>
+    <h2>🌙 Imsakiyah & Adzan</h2>
+    
+    <button class="btn-gps" id="btnGps" onclick="getLocation()">📍 Lokasi Saya Otomatis</button>
+    <div id="loader"></div>
+
+    <div class="search-container">
+        <input type="text" id="inputKota" placeholder="Ketik kota & Enter..." autocomplete="off">
+        <div id="listKota" class="autocomplete-list"></div>
+    </div>
+
+    <div id="resultBox" class="result-box">
+        <div class="countdown-card" id="countCard">
+            <small id="labelCount">Menuju Imsak</small>
+            <div class="countdown-time" id="textCount">00:00:00</div>
+        </div>
+        <div class="info-card">
+            <strong id="resKota" style="text-transform: uppercase; color: #666;">-</strong>
+            <div class="imsak-val" id="resImsak">--:--</div>
+            <div id="resDetail" style="font-weight: 600;">Subuh: --:-- | Maghrib: --:--</div>
+        </div>
+    </div>
+</div>
+
+<audio id="adzanAudio" src="https://www.islamcan.com/audio/adzan/azan1.mp3"></audio>
+
+<script>
+    let daftarKota = [], fuse, countdownInterval, currentResults = [], hasBeeped = [];
+
+    setInterval(() => { document.getElementById('liveClock').innerText = new Date().toLocaleTimeString('id-ID'); }, 1000);
+
+    async function init() {
+        try {
+            const res = await fetch('https://api.myquran.com/v2/sholat/kota/semua');
+            const data = await res.json();
+            daftarKota = data.data;
+            fuse = new Fuse(daftarKota, { keys: ['lokasi'], threshold: 0.4 });
+            const lastId = localStorage.getItem('lastId'), lastNama = localStorage.getItem('lastNama');
+            if(lastId) pilihKota(lastId, lastNama);
+        } catch (e) { console.error("Load failed"); }
+    }
+
+    const input = document.getElementById('inputKota');
+    input.addEventListener('input', function() {
+        const list = document.getElementById('listKota');
+        list.innerHTML = '';
+        if (this.value.length < 2) { list.style.display = 'none'; return; }
+        currentResults = fuse.search(this.value).slice(0, 5);
+        currentResults.forEach((r, i) => {
+            const div = document.createElement('div');
+            const isTypo = i === 0 && r.item.lokasi.toLowerCase() !== this.value.toLowerCase();
+            div.innerHTML = isTypo ? `<span style="font-size:10px; color:orange; display:block">MUNGKIN MAKSUD ANDA:</span>${r.item.lokasi}` : r.item.lokasi;
+            div.onclick = () => pilihKota(r.item.id, r.item.lokasi);
+            list.appendChild(div);
+        });
+        list.style.display = 'block';
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && currentResults.length > 0) {
+            pilihKota(currentResults[0].item.id, currentResults[0].item.lokasi);
+            document.getElementById('listKota').style.display = 'none';
+            this.blur();
+        }
+    });
+
+    function getLocation() {
+        const btn = document.getElementById('btnGps'), loader = document.getElementById('loader');
+        btn.disabled = true; loader.style.display = 'block';
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const res = await fetch(`https://api.myquran.com/v2/sholat/kota/lokasi/${pos.coords.latitude}/${pos.coords.longitude}`);
+            const data = await res.json();
+            btn.disabled = false; loader.style.display = 'none';
+            if(data.data) pilihKota(data.data.id, data.data.lokasi);
+        }, () => { btn.disabled = false; loader.style.display = 'none'; alert("Gagal GPS"); });
+    }
+
+    async function pilihKota(id, nama) {
+        input.value = nama;
+        document.getElementById('listKota').style.display = 'none';
+        const t = new Date();
+        const res = await fetch(`https://api.myquran.com/v2/sholat/jadwal/${id}/${t.getFullYear()}/${t.getMonth()+1}/${t.getDate()}`);
+        const data = await res.json();
+        const j = data.data.jadwal;
+
+        document.getElementById('resultBox').style.display = 'block';
+        document.getElementById('resKota').innerText = nama;
+        document.getElementById('resImsak').innerText = j.imsak;
+        document.getElementById('resDetail').innerText = `Subuh: ${j.subuh} | Maghrib: ${j.maghrib}`;
+        
+        localStorage.setItem('lastId', id);
+        localStorage.setItem('lastNama', nama);
+        startGlobalLogic(j.imsak, j.maghrib);
+    }
+
+    function startGlobalLogic(imsakTime, maghribTime) {
+        if(countdownInterval) clearInterval(countdownInterval);
+        hasBeeped = [];
+
+        countdownInterval = setInterval(() => {
+            const now = new Date();
+            const targetImsak = parseTime(imsakTime);
+            const targetMaghrib = parseTime(maghribTime);
+
+            let diffImsak = targetImsak - now;
+            let diffMaghrib = targetMaghrib - now;
+
+            // Logika Suara Bip (5 menit sebelum Imsak)
+            let minImsak = Math.floor(diffImsak/60000);
+            if(minImsak < 5 && minImsak >= 0 && !hasBeeped.includes('i'+minImsak)) {
+                playBeep(440, 0.2); hasBeeped.push('i'+minImsak);
+            }
+
+            // Logika Adzan Maghrib
+            if(diffMaghrib <= 0 && diffMaghrib > -2000) {
+                document.getElementById('adzanAudio').play();
+                document.getElementById('notifPopup').style.display = 'block';
+            }
+
+            // Display Countdown (Prioritas Imsak jika belum lewat, lalu Maghrib)
+            let displayTime, label;
+            if(diffImsak > 0) {
+                displayTime = diffImsak; label = "Menuju Imsak";
+                document.getElementById('countCard').style.background = "#004d40";
+            } else if(diffMaghrib > 0) {
+                displayTime = diffMaghrib; label = "Menuju Buka Puasa (Maghrib)";
+                document.getElementById('countCard').style.background = "#e65100";
+            } else {
+                displayTime = 0; label = "Selamat Beribadah";
+            }
+
+            updateUI(displayTime, label);
+        }, 1000);
+    }
+
+    function parseTime(t) {
+        const [h, m] = t.split(':');
+        const d = new Date(); d.setHours(h, m, 0); return d;
+    }
+
+    function updateUI(ms, label) {
+        document.getElementById('labelCount').innerText = label;
+        if(ms <= 0) { document.getElementById('textCount').innerText = "--:--:--"; return; }
+        const h = Math.floor(ms/3600000).toString().padStart(2,'0');
+        const m = Math.floor((ms%3600000)/60000).toString().padStart(2,'0');
+        const s = Math.floor((ms%60000)/1000).toString().padStart(2,'0');
+        document.getElementById('textCount').innerText = `${h}:${m}:${s}`;
+    }
+
+    function playBeep(f, d) {
+        const a = new (window.AudioContext || window.webkitAudioContext)();
+        const o = a.createOscillator(); const g = a.createGain();
+        o.connect(g); g.connect(a.destination);
+        o.frequency.value = f; g.gain.setValueAtTime(0.1, a.currentTime);
+        o.start(); o.stop(a.currentTime + d);
+    }
+
+    init();
+</script>
+</body>
+</html>

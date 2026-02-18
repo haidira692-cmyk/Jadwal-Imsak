@@ -36,7 +36,7 @@
         input { width: 100%; padding: 15px 45px 15px 15px; border: 2px solid var(--border); border-radius: 12px; box-sizing: border-box; outline: none; font-size: 1rem; background: var(--card-bg); color: var(--text); }
         #clearInput { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999; display: none; }
         .btn-gps { background: transparent; color: var(--primary); border: 2px solid var(--primary); padding: 12px; width: 100%; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
-        
+
         .autocomplete-list { position: absolute; width: 100%; background: var(--card-bg); border: 1px solid var(--border); z-index: 99; max-height: 200px; overflow-y: auto; text-align: left; border-radius: 10px; display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .autocomplete-list div { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
 
@@ -154,9 +154,36 @@
     }
 
     // PWA INSTALL LOGIC
+    // Ganti logika install lama dengan ini agar lebih stabil
     let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('installBtn').style.display = 'inline-block'; });
-    document.getElementById('installBtn').addEventListener('click', async () => { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('installBtn').style.display = 'none'; } });
+    const installBtn = document.getElementById('installBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Mencegah Chrome memunculkan pop-up otomatis
+        e.preventDefault();
+        // Simpan event agar bisa dipicu nanti
+        deferredPrompt = e;
+        // Tampilkan tombol install kita
+        installBtn.style.display = 'inline-block';
+    });
+
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.style.display = 'none';
+            }
+            deferredPrompt = null;
+        } else {
+            // Jika tidak bisa install otomatis, beri instruksi manual
+            Swal.fire({
+                title: 'Cara Install',
+                text: 'Klik ikon titik tiga (⋮) di pojok kanan atas browser, lalu pilih "Instal aplikasi" atau "Tambahkan ke Layar Utama".',
+                icon: 'info'
+            });
+        }
+    });
 
     async function init() {
         try {

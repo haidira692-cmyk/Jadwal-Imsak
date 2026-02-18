@@ -243,6 +243,47 @@
     function parseTime(t) { const [h, m] = t.split(':'); const d = new Date(); d.setHours(h, m, 0); return d; }
     function playBeep(f, d) { try { const a = new (window.AudioContext || window.webkitAudioContext)(); const o = a.createOscillator(); const g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = f; g.gain.setValueAtTime(0.05, a.currentTime); o.start(); o.stop(a.currentTime + d); } catch(e) {} }
     init();
+
+    // Konfigurasi Versi Aplikasi
+    const APP_VERSION = "2.0"; // Naikkan angka ini jika Anda melakukan update lagi nanti
+
+    function showUpdateLog() {
+        const lastVersion = localStorage.getItem('app_version');
+
+        // Jika versi berbeda atau belum pernah buka web, tampilkan pop-up
+        if (lastVersion !== APP_VERSION) {
+            Swal.fire({
+                title: '<strong>Update Terbaru v' + APP_VERSION + '</strong>',
+                icon: 'info',
+                html: `
+                    <div style="text-align: left; font-size: 0.9rem; line-height: 1.6;">
+                        <p>Berikut adalah pembaruan pada versi ini:</p>
+                        <ul style="padding-left: 20px;">
+                            <li><b>🌙 Dark Mode Manual:</b> Klik ikon bulan di pojok kanan atas.</li>
+                            <li><b>✅ Jadwal Isya:</b> Sekarang jadwal Isya sudah muncul kembali.</li>
+                            <li><b>🔄 Hitung Mundur Otomatis:</b> Langsung pindah ke Imsak setelah buka puasa selesai.</li>
+                            <li><b>📢 Notifikasi Adzan:</b> Suara adzan otomatis saat waktu Maghrib tiba.</li>
+                            <li><b>📱 Wake Lock:</b> Layar tetap menyala saat countdown berjalan.</li>
+                            <li><b>📲 Tombol Share:</b> Bagikan jadwal langsung ke WhatsApp grup.</li>
+                        </ul>
+                        <p style="margin-top:10px; color: var(--primary);"><i>Terima kasih telah menggunakan Imsakiyah Pro!</i></p>
+                    </div>
+                `,
+                showCloseButton: true,
+                focusConfirm: false,
+                confirmButtonText: '<i class="fa fa-thumbs-up"></i> Siap, Mengerti!',
+                confirmButtonColor: '#004d40',
+                background: document.body.classList.contains('dark-theme') ? '#1e1e1e' : '#fff',
+                color: document.body.classList.contains('dark-theme') ? '#e0e0e0' : '#333'
+            });
+
+            // Simpan versi terbaru agar tidak muncul lagi
+            localStorage.setItem('app_version', APP_VERSION);
+        }
+    }
+
+    // Jalankan pengecekan update setelah inisialisasi data
+    setTimeout(showUpdateLog, 1500); // Delay 1.5 detik agar tidak bentrok dengan loading awal
 </script>
 </body>
 </html>

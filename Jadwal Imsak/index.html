@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
     <style>
         :root { 
@@ -56,6 +57,20 @@
         .footer-note { background: #fff3e0; color: #e65100; padding: 12px; border-radius: 12px; margin-top: 10px; border: 1px solid #ffe0b2; text-align: left; line-height: 1.4; }
         body.dark-theme .footer-note { background: #2a1b00; border-color: #4d3300; }
         #notifPopup { display: none; position: fixed; top: 20px; background: var(--maghrib); color: white; padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 10000; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+
+        /* TAMBAHAN: Style khusus tombol download & poster */
+        .btn-poster { background: #0288d1; color: white; border: none; padding: 12px; width: 100%; border-radius: 12px; cursor: pointer; font-weight: bold; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        /* Update Style Poster agar muat semua kolom & 31 baris */
+        #poster-area { 
+            position: absolute; left: -9999px; top: -9999px; 
+            width: 650px; background: white; padding: 25px; color: #333; 
+        }
+        .poster-title { text-align: center; color: #004d40; border-bottom: 4px solid #ffc107; padding-bottom: 10px; margin-bottom: 15px; }
+        .poster-table { width: 100%; border-collapse: collapse; }
+        .poster-table th { background: #004d40; color: white; padding: 6px 2px; font-size: 11px; text-transform: uppercase; }
+        .poster-table td { border: 1px solid #ccc; padding: 4px 2px; text-align: center; font-size: 10.5px; font-family: 'Courier New', monospace; font-weight: bold; }
+        .poster-table tr:nth-child(even) { background: #f9f9f9; }
+        .bg-maghrib { background: #fff3e0 !important; color: #e65100; }
     </style>
 </head>
 <body>
@@ -101,6 +116,36 @@
             </div>
             <div id="resTanggalApi" style="font-size: 0.75rem; margin-top: 15px; opacity: 0.5;"></div>
         </div>
+
+        <button class="btn-poster" onclick="downloadPoster()">
+            <i class="fas fa-image"></i> Download Jadwal 30 Hari
+        </button>
+    </div>
+</div>
+
+<div id="poster-area">
+    <div class="poster-title">
+        <h2 style="margin:0; font-size: 22px;">JADWAL IMSAKIYAH RAMADHAN 1447 H</h2>
+        <h3 id="pKota" style="margin:5px 0; color: #555;">KOTA</h3>
+        <small>18 Februari 2026 - 20 Maret 2026</small>
+    </div>
+    <table class="poster-table">
+        <thead>
+            <tr>
+                <th>Hari</th>
+                <th>Tanggal</th>
+                <th>Imsak</th>
+                <th>Subuh</th>
+                <th>Dzuhur</th>
+                <th>Ashar</th>
+                <th>Maghrib</th>
+                <th>Isya</th>
+            </tr>
+        </thead>
+        <tbody id="pBody"></tbody>
+    </table>
+    <div style="text-align:center; margin-top:10px; font-size:10px; color:#888;">
+        © 2026 Imsakiyah Pro - Sultan Ahmad Haidir | Data: Kemenag RI
     </div>
 </div>
 
@@ -110,14 +155,14 @@
     <div class="footer-note">
         <strong>Pemberitahuan:</strong> Jadwal sinkron dengan API Kemenag RI. Selalu dahulukan adzan dari masjid setempat. 
     </div>
-    <p>© 2026 Digital Imsakiyah - Versi 3.6</p>
+    <p>© 2026 Digital Imsakiyah - Versi 3.7</p>
 </div>
 
 <audio id="adzanAudio" src="https://www.islamcan.com/audio/adhan/azan1.mp3" preload="auto"></audio>
 
 <script>
     let daftarKota = [], fuse, countdownInterval, hasBeeped = [];
-    const APP_VERSION = "3.6";
+    const APP_VERSION = "3.7";
     const input = document.getElementById('inputKota');
     const clearBtn = document.getElementById('clearInput');
 
@@ -136,8 +181,13 @@
 
     setInterval(() => { 
         const n = new Date();
-        document.getElementById('liveClock').innerText = n.toLocaleTimeString('id-ID'); 
-        document.getElementById('liveDate').innerText = n.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('liveClock').innerText = n.toLocaleTimeString('id-ID', { 
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+        }).replace(/\./g, ':'); 
+        
+        document.getElementById('liveDate').innerText = n.toLocaleDateString('id-ID', { 
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+        });
     }, 1000);
 
     // 2. FETCH DATABASE & FUZZY SEARCH
@@ -147,7 +197,6 @@
             const data = await res.json();
             daftarKota = data.data;
 
-            // Fuzzy Search: Sangat toleran terhadap typo (threshold 0.5)
             fuse = new Fuse(daftarKota, { 
                 keys: ['lokasi'], 
                 threshold: 0.5,
@@ -155,7 +204,6 @@
                 ignoreLocation: true
             });
             
-            // FITUR MEMORI: Langsung buka kota terakhir
             const lastId = localStorage.getItem('lastId');
             const lastNama = localStorage.getItem('lastNama');
             if(lastId) pilihKota(lastId, lastNama);
@@ -169,7 +217,7 @@
         }
     }
 
-    // 3. SEARCH AUTOCOMPLETE (FIXED TYPO HANDLING)
+    // 3. SEARCH AUTOCOMPLETE
     input.addEventListener('input', function() {
         const list = document.getElementById('listKota');
         list.innerHTML = '';
@@ -200,8 +248,7 @@
 
     function hapusInput() { input.value = ""; clearBtn.style.display = "none"; document.getElementById('listKota').style.display = "none"; }
 
-    // 4. GPS LOGIC (SMART HANDLING)
-    // GPS LOGIC V3.8 (Instant Auto-Select)
+    // 4. GPS LOGIC
     function getLocation() {
         const btn = document.getElementById('btnGps');
         btn.disabled = true;
@@ -212,7 +259,6 @@
             const lon = pos.coords.longitude;
 
             try {
-                // Tahap 1: Coba cari di database Kemenag langsung
                 const res = await fetch(`https://api.myquran.com/v2/sholat/kota/lokasi/${lat}/${lon}`);
                 const data = await res.json();
                 
@@ -220,20 +266,15 @@
                     pilihKota(data.data.id, data.data.lokasi);
                     Swal.fire({ title: 'Berhasil', text: data.data.lokasi, icon: 'success', timer: 1500, showConfirmButton: false });
                 } else {
-                    // Tahap 2: Fallback ke OpenStreetMap
                     const osm = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                     const resOsm = await osm.json();
                     const namaWilayah = resOsm.address.city || resOsm.address.town || resOsm.address.county || "";
                     
                     if(namaWilayah) {
-                        // Tahap 3: AUTO-SELECT dari database lokal menggunakan Fuse.js
                         const hasilPencarian = fuse.search(namaWilayah);
-                        
                         if (hasilPencarian.length > 0) {
-                            // Ambil hasil pertama yang paling cocok (misal: KOTA KENDARI)
                             const kotaTerpilih = hasilPencarian[0].item;
                             pilihKota(kotaTerpilih.id, kotaTerpilih.lokasi);
-                            
                             Swal.fire({
                                 title: "Lokasi Disesuaikan",
                                 text: `Kami mendeteksi Anda di ${namaWilayah}, jadwal disesuaikan ke ${kotaTerpilih.lokasi}`,
@@ -270,7 +311,6 @@
         document.getElementById('listKota').style.display = 'none';
         clearBtn.style.display = "block";
         
-        // Simpan ke Memori
         localStorage.setItem('lastId', id);
         localStorage.setItem('lastNama', nama);
 
@@ -338,18 +378,99 @@
         }, 1000);
     }
 
+    // TAMBAHAN: Fungsi Download Poster 30 Hari
+    async function downloadPoster() {
+        const id = localStorage.getItem('lastId');
+        const nama = localStorage.getItem('lastNama');
+        if (!id) return Swal.fire("Error", "Pilih kota terlebih dahulu", "error");
+
+        const tahun = 2026;
+        
+        Swal.fire({ 
+            title: 'Menyusun Poster...', 
+            text: 'Menggabungkan jadwal 18 Feb - 20 Mar', 
+            allowOutsideClick: false, 
+            didOpen: () => Swal.showLoading() 
+        });
+
+        try {
+            // Ambil data Februari & Maret
+            const [resFeb, resMar] = await Promise.all([
+                fetch(`https://api.myquran.com/v2/sholat/jadwal/${id}/${tahun}/02`),
+                fetch(`https://api.myquran.com/v2/sholat/jadwal/${id}/${tahun}/03`)
+            ]);
+            
+            const dataFeb = await resFeb.json();
+            const dataMar = await resMar.json();
+
+            const pBody = document.getElementById('pBody');
+            pBody.innerHTML = '';
+            document.getElementById('pKota').innerText = nama;
+
+            // Gabungkan & Filter tanggal 18 Feb s/d 20 Mar
+            const semuaHari = [...dataFeb.data.jadwal, ...dataMar.data.jadwal];
+            const jadwalRamadhan = semuaHari.filter(item => {
+                return (item.date >= "2026-02-18" && item.date <= "2026-03-20");
+            });
+
+            // Masukkan ke Tabel dengan kolom yang sinkron
+            jadwalRamadhan.forEach((d, index) => {
+                const tglTampil = d.tanggal.split(',')[1].trim().split('/').slice(0,2).join('/'); // Hasil: "18/02"
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${tglTampil}</td>
+                    <td>${d.imsak}</td>
+                    <td>${d.subuh}</td>
+                    <td>${d.dzuhur}</td>
+                    <td>${d.ashar}</td>
+                    <td class="bg-maghrib">${d.maghrib}</td>
+                    <td>${d.isya}</td>
+                `;
+                pBody.appendChild(tr);
+            });
+
+            // Proses Capture
+            setTimeout(() => {
+                html2canvas(document.querySelector("#poster-area"), {
+                    scale: 3, // Skala tinggi agar gambar tajam (HD)
+                    logging: false,
+                    useCORS: true,
+                    backgroundColor: "#ffffff"
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `Jadwal_Imsakiyah_1447H_${nama.replace(/ /g,'_')}.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                    Swal.close();
+                });
+            }, 1000);
+
+        } catch(e) {
+            console.error(e);
+            Swal.fire("Error", "Gagal mengambil data bulan Februari/Maret.", "error");
+        }
+    }
+
     function parseTime(t) { const [h, m] = t.split(':'); const d = new Date(); d.setHours(h, m, 0); return d; }
     function playBeep(f, d) { try { const a = new AudioContext(); const o = a.createOscillator(); const g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = f; g.gain.setValueAtTime(0.1, a.currentTime); o.start(); o.stop(a.currentTime + d); } catch(e) {} }
 
     function showUpdateLog() {
         Swal.fire({
-            title: 'Imsakiyah Pro v3.6',
-            html: `<ul style="text-align:left; font-size:0.9rem;">
-                <li><b>Smart Search:</b> Pencarian tetap ketemu walau typo.</li>
-                <li><b>Memory:</b> Aplikasi ingat kota terakhir Anda.</li>
-                <li><b>GPS Fix:</b> Penanganan error lokasi yang lebih sopan.</li>
-            </ul>`,
-            confirmButtonColor: '#004d40'
+            title: 'Imsakiyah Pro v3.7',
+            html: `
+                <div style="text-align:left; font-size:0.9rem; line-height: 1.6;">
+                    <p><strong>Apa yang baru di versi ini?</strong></p>
+                    <ul style="padding-left: 20px;">
+                        <li><b>📸 Download Poster 30 Hari:</b> Simpan jadwal satu bulan penuh dalam bentuk gambar (PNG) untuk dibagikan ke keluarga atau grup WA.</li>
+                        <li><b>🧠 Smart Fuzzy Search:</b> Pencarian kota lebih pintar, tetap ketemu meskipun ada sedikit kesalahan penulisan (typo).</li>
+                        <li><b>💾 Auto-Memory:</b> Aplikasi otomatis menyimpan lokasi terakhir Anda, tidak perlu cari ulang saat dibuka kembali.</li>
+                        <li><b>🛰️ Precise GPS:</b> Peningkatan akurasi deteksi lokasi otomatis menggunakan integrasi OpenStreetMap.</li>
+                        <li><b>🔊 Adzan & Beep:</b> Notifikasi suara saat masuk waktu buka puasa dan pengingat 5 menit sebelum Imsak.</li>
+                    </ul>
+                </div>`,
+            confirmButtonColor: '#004d40',
+            confirmButtonText: 'Siap, Jalankan!'
         });
     }
 
